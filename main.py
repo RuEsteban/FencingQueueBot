@@ -3,13 +3,21 @@ import json
 import random
 
 # event log
-# seperate strips
-#
+# seperate strips queues versus combined strip queues
+# Queue UI
+# /challenge @Username yourscore, theirscore
+# /bout @Username yourscore, theirscore
+#   Enter two numbers, your score first, opponent score second, parse input from there, infer winner
+#   bot auto updates elo
+# scheduled inhouse tourny
+# two sep elos, one private, one public for club events
+# users have notes on profile to keep track of performance /note @user
 
 from telebot import TeleBot
 from itertools import combinations
 
 # Set your bot token here
+# replace os.environ.get('BOT_TOKEN') with 'paste_bot_token_here'
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 bot = TeleBot(BOT_TOKEN)
 
@@ -90,7 +98,7 @@ def create_new_poll(message):
         'poll_id': sent_poll.poll.id,
         'question': poll_question,
         'options': poll_options,
-        'yes_voters': []  # Initialize list of users who voted "Yes"
+        'yes_voters': []  # Initialize list of users who voted "Yes",
     }
 
 
@@ -186,7 +194,9 @@ def update_wins(message):
             'name': user_name,
             'wins': 1,
             'losses': 0,
-            'indicator': 1
+            'indicator': 1,
+            'elo': 0,
+            'notes': ""
         }
 
     # Update the indicator
