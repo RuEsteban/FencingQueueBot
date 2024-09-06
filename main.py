@@ -1,6 +1,8 @@
 import os
 import json
 import random
+import datetime
+import re
 
 # event log
 # seperate strips queues versus combined strip queues
@@ -356,6 +358,129 @@ def validate_clearance(message):
         pending_validation_users.pop(user_id, None)
     else:
         bot.send_message(message.from_user.id, "Invalid validation code. Try again.")
+
+
+@bot.message_handler(commands=['note'])
+def add_note_to_profile(message):
+    """Handle the /note command to add a note to a user's profile."""
+    # Parse the message to extract username and note
+    parts = message.text.split(maxsplit=2)
+
+    if len(parts) < 3:
+        bot.reply_to(message, "Usage: /note username note here")
+        return
+
+    username = parts[1].strip()
+    note = parts[2].strip()
+
+    data = load_data()
+
+    # Find the user profile by username
+    user_id = None
+    for uid, profile in data.items():
+        if profile['name'].lower() == username.lower():
+            user_id = uid
+            break
+
+    if not user_id:
+        bot.reply_to(message, f"No profile found for user '{username}'.")
+        return
+
+    # Append the note to the user's profile
+    if 'notes' in data[user_id]:
+        data[user_id]['notes'] += f"\n{note}"
+    else:
+        data[user_id]['notes'] = note
+
+    save_data(data)
+    bot.reply_to(message, f"Note added to {username}'s profile.")
+
+@bot.message_handler(commands=['mynotes'])
+def send_my_notes(message):
+    """Handle the /mynotes command to send the user's notes as a DM."""
+    user_id = str(message.from_user.id)
+    user_name = message.from_user.first_name
+
+    data = load_data()
+
+    if user_id in data:
+        user_notes = data[user_id]['notes']
+        notes_message = (f"Notes for {user_name}:\n"
+                         f"{user_notes}")
+    else:
+        notes_message = "No profile found for you. Please create a profile first using /profile."
+
+    try:
+        # Send the notes as a direct message to the user
+        bot.send_message(user_id, notes_message)
+    except Exception as e:
+        # If sending fails, notify them in the group chat to start a private chat
+        bot.reply_to(message, "Please start a private conversation with the bot and try again.")
+
+
+
+@bot.message_handler(commands=['profile'])
+def create_or_update_profile(message):
+    """Handle the /profile command to create or update a user's profile."""
+    parts = message.text.split(maxsplit=1)
+
+    if len(parts) < 2:
+        # No name provided, create or update profile for the command sender
+        user_id = str(message.from_user.id)
+        user_name = message.from_user.first_name
+
+        data = load_data()
+
+        if user_id not in data:
+            # Create a new profile with empty stats and notes
+            data[user_id] = {
+                'name': user_name,
+                'wins': 0,
+                'losses': 0,
+                'indicator': 0,
+                'elo': 0,
+                'notes': ""
+            }
+            save_data(data)
+            bot.reply_to(message, f"Profile created for you, {user_name}.")
+        else:
+            bot.reply_to(message, f"Profile already exists for you, {user_name}.")
+
+    else:
+        # Name provided, create or update profile for the specified user
+        name = parts[1].strip()
+
+        # Retrieve the list of members in the chat
+        chat_members = bot.get_chat_administrators(message.chat.id)
+        member_names = [member.user.first_name.lower() for member in chat_members]
+
+        # Search for the user by first name
+        user_id = None
+        for member in chat_members:
+            if member.user.first_name.lower() == name.lower():
+                user_id = member.user.id
+                break
+
+        if not user_id:
+            bot.reply_to(message, f"No user with the name '{name}' found in this chat.")
+            return
+
+        data = load_data()
+
+        if str(user_id) not in data:
+            # Create a new profile with empty stats and notes
+            data[str(user_id)] = {
+                'name': name,
+                'wins': 0,
+                'losses': 0,
+                'indicator': 0,
+                'elo': 0,
+                'notes': ""
+            }
+            save_data(data)
+            bot.reply_to(message, f"Profile created for {name}.")
+        else:
+            bot.reply_to(message, f"Profile already exists for {name}.")
 
 # Ensure necessary files exist at startup
 ensure_files_exist()
