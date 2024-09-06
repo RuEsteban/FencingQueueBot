@@ -320,7 +320,12 @@ def send_stats(message):
     else:
         stats_message = "No stats found for you."
 
-    bot.send_message(message.from_user.id, stats_message)
+    try:
+        # Attempt to send the message to the user's DM
+        bot.send_message(message.from_user.id, stats_message)
+    except Exception as e:
+        # If sending fails, notify them in the group chat to start a private chat
+        bot.reply_to(message, f"Please start a private conversation with the bot and try again.")
 
 
 @bot.message_handler(commands=['clear'])
