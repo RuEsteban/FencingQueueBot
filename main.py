@@ -2,6 +2,10 @@ import os
 import json
 import random
 
+# event log
+# seperate strips
+#
+
 from telebot import TeleBot
 from itertools import combinations
 
