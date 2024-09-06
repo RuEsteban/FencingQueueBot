@@ -1,18 +1,10 @@
 {
     "6213272076": {
         "name": "Ru",
-        "wins": 1,
+        "wins": 2,
         "losses": 0,
-        "indicator": 1,
+        "indicator": 2,
         "elo": 0,
-        "notes": "\ntest"
-    },
-    "5633990336": {
-        "name": "William",
-        "wins": 0,
-        "losses": 0,
-        "indicator": 0,
-        "elo": 0,
-        "notes": "\ncool"
+        "notes": "\ntest (Date: 2024-09-06 18:56:56)"
     }
 }

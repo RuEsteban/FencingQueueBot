@@ -94,6 +94,7 @@ def create_new_poll(message):
         options=poll_options,
         is_anonymous=False
     )
+    bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
 
     # Store the poll ID associated with the chat
     chat_polls[message.chat.id] = {
@@ -177,6 +178,7 @@ def add_voters(message):
                 poll_data['yes_voters'].append((name, fake_user_id))
 
         bot.reply_to(message, f"Added names: {', '.join(names_list)}")
+        bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     else:
         bot.reply_to(message, "No poll data available for this chat.")
 
@@ -325,6 +327,7 @@ def send_stats(message):
     try:
         # Attempt to send the message to the user's DM
         bot.send_message(message.from_user.id, stats_message)
+        bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     except Exception as e:
         # If sending fails, notify them in the group chat to start a private chat
         bot.reply_to(message, f"Please start a private conversation with the bot and try again.")
@@ -340,6 +343,7 @@ def clear_command(message):
     user_id = message.from_user.id
     pending_validation_users[user_id] = True  # Mark the user as waiting for validation
     bot.send_message(user_id, "Please send the validation code to proceed with data clearance.")
+    bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
 
 
 @bot.message_handler(func=lambda message: message.from_user.id in pending_validation_users, content_types=['text'])
@@ -353,12 +357,15 @@ def validate_clearance(message):
             json.dump({}, file, indent=4)
 
         bot.send_message(user_id, "Data cleared successfully.")
+        bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
 
         # Remove the user from the pending validation list
         pending_validation_users.pop(user_id, None)
     else:
         bot.send_message(message.from_user.id, "Invalid validation code. Try again.")
 
+
+from datetime import datetime
 
 @bot.message_handler(commands=['note'])
 def add_note_to_profile(message):
@@ -386,14 +393,16 @@ def add_note_to_profile(message):
         bot.reply_to(message, f"No profile found for user '{username}'.")
         return
 
-    # Append the note to the user's profile
+    # Append the note to the user's profile with the current date
+    date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if 'notes' in data[user_id]:
-        data[user_id]['notes'] += f"\n{note}"
+        data[user_id]['notes'] += f"\n{note} (Date: {date_str})"
     else:
-        data[user_id]['notes'] = note
+        data[user_id]['notes'] = f"{note} (Date: {date_str})"
 
     save_data(data)
-    bot.reply_to(message, f"Note added to {username}'s profile.")
+    bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+
 
 @bot.message_handler(commands=['mynotes'])
 def send_my_notes(message):
@@ -404,83 +413,42 @@ def send_my_notes(message):
     data = load_data()
 
     if user_id in data:
-        user_notes = data[user_id]['notes']
-        notes_message = (f"Notes for {user_name}:\n"
-                         f"{user_notes}")
+        user_notes = data[user_id].get('notes', 'No notes available.')
+        notes_message = f"Notes for {user_name}:\n{user_notes}"
     else:
         notes_message = "No profile found for you. Please create a profile first using /profile."
 
     try:
         # Send the notes as a direct message to the user
         bot.send_message(user_id, notes_message)
+        bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     except Exception as e:
         # If sending fails, notify them in the group chat to start a private chat
         bot.reply_to(message, "Please start a private conversation with the bot and try again.")
 
 
-
 @bot.message_handler(commands=['profile'])
 def create_or_update_profile(message):
     """Handle the /profile command to create or update a user's profile."""
-    parts = message.text.split(maxsplit=1)
+    user_id = str(message.from_user.id)
+    user_name = message.from_user.first_name
 
-    if len(parts) < 2:
-        # No name provided, create or update profile for the command sender
-        user_id = str(message.from_user.id)
-        user_name = message.from_user.first_name
+    data = load_data()
 
-        data = load_data()
-
-        if user_id not in data:
-            # Create a new profile with empty stats and notes
-            data[user_id] = {
-                'name': user_name,
-                'wins': 0,
-                'losses': 0,
-                'indicator': 0,
-                'elo': 0,
-                'notes': ""
-            }
-            save_data(data)
-            bot.reply_to(message, f"Profile created for you, {user_name}.")
-        else:
-            bot.reply_to(message, f"Profile already exists for you, {user_name}.")
-
+    if user_id not in data:
+        # Create a new profile with empty stats and notes
+        data[user_id] = {
+            'name': user_name,
+            'wins': 0,
+            'losses': 0,
+            'indicator': 0,
+            'elo': 0,
+            'notes': ""
+        }
+        save_data(data)
+        bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     else:
-        # Name provided, create or update profile for the specified user
-        name = parts[1].strip()
-
-        # Retrieve the list of members in the chat
-        chat_members = bot.get_chat_administrators(message.chat.id)
-        member_names = [member.user.first_name.lower() for member in chat_members]
-
-        # Search for the user by first name
-        user_id = None
-        for member in chat_members:
-            if member.user.first_name.lower() == name.lower():
-                user_id = member.user.id
-                break
-
-        if not user_id:
-            bot.reply_to(message, f"No user with the name '{name}' found in this chat.")
-            return
-
-        data = load_data()
-
-        if str(user_id) not in data:
-            # Create a new profile with empty stats and notes
-            data[str(user_id)] = {
-                'name': name,
-                'wins': 0,
-                'losses': 0,
-                'indicator': 0,
-                'elo': 0,
-                'notes': ""
-            }
-            save_data(data)
-            bot.reply_to(message, f"Profile created for {name}.")
-        else:
-            bot.reply_to(message, f"Profile already exists for {name}.")
+        bot.reply_to(message, f"Profile already exists for you, {user_name}.")
 
 # Ensure necessary files exist at startup
 ensure_files_exist()
