@@ -174,7 +174,7 @@ def add_voters(message):
                 fake_user_id = 1000 + len(poll_data['yes_voters']) + 1
                 poll_data['yes_voters'].append((name, fake_user_id))
 
-        bot.reply_to(message, f"Added names: {', '.join(names_list)}.")
+        bot.reply_to(message, f"Added names: {', '.join(names_list)}")
     else:
         bot.reply_to(message, "No poll data available for this chat.")
 
