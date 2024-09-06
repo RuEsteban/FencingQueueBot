@@ -328,19 +328,34 @@ def send_stats(message):
         bot.reply_to(message, f"Please start a private conversation with the bot and try again.")
 
 
+pending_validation_users = {}  # To track users awaiting validation
+VALIDATION_CODE = '1234'  # Replace with your chosen validation code
+
+
 @bot.message_handler(commands=['clear'])
 def clear_command(message):
     """Initiate the clear data process."""
-    bot.send_message(message.from_user.id, "Please send the validation code to proceed with data clearance.")
+    user_id = message.from_user.id
+    pending_validation_users[user_id] = True  # Mark the user as waiting for validation
+    bot.send_message(user_id, "Please send the validation code to proceed with data clearance.")
 
 
-@bot.message_handler(func=lambda message: message.text == VALIDATION_CODE, content_types=['text'])
-def clear_data(message):
-    """Clear data after validation code is received."""
-    with open(DATA_FILE, 'w') as file:
-        json.dump({}, file, indent=4)
-    bot.send_message(message.from_user.id, "Data cleared successfully.")
+@bot.message_handler(func=lambda message: message.from_user.id in pending_validation_users, content_types=['text'])
+def validate_clearance(message):
+    """Validate the clearance request with the validation code."""
+    if message.text == VALIDATION_CODE:
+        user_id = message.from_user.id
 
+        # Clear the data
+        with open(DATA_FILE, 'w') as file:
+            json.dump({}, file, indent=4)
+
+        bot.send_message(user_id, "Data cleared successfully.")
+
+        # Remove the user from the pending validation list
+        pending_validation_users.pop(user_id, None)
+    else:
+        bot.send_message(message.from_user.id, "Invalid validation code. Try again.")
 
 # Ensure necessary files exist at startup
 ensure_files_exist()
