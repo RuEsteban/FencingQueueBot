@@ -22,7 +22,7 @@ from itertools import combinations
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 # Set your bot token here
 # replace os.environ.get('BOT_TOKEN') with 'paste_bot_token_here'
-bot = TeleBot('TOKEN HERE')
+bot = TeleBot('7286594752:AAHTsA-prAuzXxoxrYx1LatDhsgd1IEcTUI')
 
 # Define the path to the JSON files and the public list
 DATA_FILE = 'user_data.json'

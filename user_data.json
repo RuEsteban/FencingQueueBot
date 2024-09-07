@@ -11,5 +11,13 @@
         "wins": 2,
         "losses": 0,
         "indicator": 2
+    },
+    "5633990336": {
+        "name": "William",
+        "wins": 1,
+        "losses": 0,
+        "indicator": 1,
+        "elo": 0,
+        "notes": ""
     }
 }
