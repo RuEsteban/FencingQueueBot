@@ -1,7 +1,7 @@
 import os
 import json
 import random
-
+import dev_functions
 # event log
 # seperate strips queues versus combined strip queues
 # Queue UI
@@ -13,18 +13,32 @@ import random
 # two sep elos, one private, one public for club events
 # users have notes on profile to keep track of performance /note @user
 
+###### TODOS
+## add person to pool
+## remove person from pool
+
 from telebot import TeleBot
 from itertools import combinations
-
+from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 # Set your bot token here
 # replace os.environ.get('BOT_TOKEN') with 'paste_bot_token_here'
-BOT_TOKEN = os.environ.get('BOT_TOKEN')
-bot = TeleBot(BOT_TOKEN)
+bot = TeleBot('TOKEN HERE')
 
 # Define the path to the JSON files and the public list
 DATA_FILE = 'user_data.json'
 VALIDATION_CODE = 'your_secret_code_here'  # Replace with your chosen validation code
+
 chat_polls = {}
+
+pairs_queue = {}
+
+participation_table = {}
+participation_count = {}
+
+bout_iterator = 0
+bout_history = []
+
+num_strips = 0
 
 def generate_and_shuffle_pairs(names):
     def has_consecutive_repeats(pairs):
@@ -101,6 +115,59 @@ def create_new_poll(message):
         'yes_voters': []  # Initialize list of users who voted "Yes",
     }
 
+#auto generate poll with filled users for testing
+@bot.message_handler(commands=['poll_dev'])
+def create_new_poll(message):
+
+    global participation_count, participation_table, bout_history, bout_iterator
+
+    # Define the poll question and options
+    poll_question = "Practice?"
+    poll_options = ["Yes", "No", "Maybe"]
+
+    # Send the poll and store the poll_id
+    sent_poll = bot.send_poll(
+        chat_id=message.chat.id,
+        question=poll_question,
+        options=poll_options,
+        is_anonymous=False
+    )
+
+    # Store the poll ID associated with the chat
+    chat_polls[message.chat.id] = {
+        'poll_id': sent_poll.poll.id,
+        'question': poll_question,
+        'options': poll_options,
+        'yes_voters': []  # Initialize list of users who voted "Yes",
+    }
+    poll_data = chat_polls[message.chat.id]
+
+    #reset globals when you make a new poll
+        
+    participation_table = {}
+    participation_count = {}
+
+    bout_iterator = 0
+    bout_history = []
+
+    num_strips = 0
+
+
+    names_list = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']
+    for name in names_list:
+            # Use a placeholder user ID for the fake users
+            fake_user_id = 1000 + len(poll_data['yes_voters']) + 1
+            poll_data['yes_voters'].append((name, fake_user_id))
+
+
+#lists all fencers 
+@bot.message_handler(commands=['list_all_fencers'])
+def list_all_fencers(message):
+    fencers = chat_polls[message.chat.id]['yes_voters']
+    print(fencers)
+    bot.reply_to(message, fencers)
+
+
 
 @bot.poll_answer_handler(func=lambda poll_answer: True)
 def handle_poll_answer(poll_answer):
@@ -126,27 +193,112 @@ def handle_poll_answer(poll_answer):
 def create_queue(message):
     # Retrieve the latest poll data for the chat
     if message.chat.id in chat_polls:
+
+        if len(chat_polls[message.chat.id]['yes_voters']) < 2:
+                bot.reply_to(message, "Not enough yes voters")
+
         poll_data = chat_polls[message.chat.id]
 
         # Get the list of first names who voted "Yes"
         first_names = [first_name for first_name, _ in poll_data['yes_voters']]
 
-        # Generate unique pairs
-        pairs_queue = generate_and_shuffle_pairs(first_names)
-
+        # Generate unique pairs only if the pairs_queue is empty, which occurs when you make a new poll
         if pairs_queue is None:
-            bot.reply_to(message, "Could not generate a valid queue. Please try again later.")
-            return
+            pairs_queue = generate_and_shuffle_pairs(first_names)
+
+        #TODO handle no poll data?
 
         # Format the pairs into a string
-        queue_string = "Queue:\n"
-        for pair in pairs_queue:
-            queue_string += f"{pair[0]} vs {pair[1]}\n"
+        queue_string = queue_format_long(pairs_queue=pairs_queue)
 
         bot.reply_to(message, queue_string)
     else:
         bot.reply_to(message, "No poll data available for this chat.")
 
+def queue_format_long(pairs_queue):
+    queue_string = "Queue:\n"
+    for pair in pairs_queue:
+        queue_string += f"{pair[0]} vs {pair[1]}\n"
+    return queue_string
+
+#return a match up given the participation table (which is global)
+def weighted_matchup_generate(participation_table, num_of_strips):
+    global participation_count
+    global bout_history
+    matchup, participation_count = dev_functions.weighted_random_pairing(participation_count=participation_table, bout_history=bout_history, bout_iterator=bout_iterator, rate_limiter=num_of_strips)
+    bout_history.insert(len(bout_history),matchup)
+
+    return matchup
+
+@bot.message_handler(commands=['weighted_queue'])
+def create_weighted_queue(message):
+    global participation_table
+    global num_strips
+    # Retrieve the latest poll data for the chat
+
+    strips_arg = message.text.split(maxsplit=1)
+
+    if len(strips_arg) < 2:
+        bot.reply_to(message, "Please provide an argument for the number of strips")
+        return
+    
+    num_strips = int(strips_arg[1])
+    
+    if message.chat.id in chat_polls:
+        poll_data = chat_polls[message.chat.id]
+
+        # Get the list of first names who voted "Yes"
+        first_names = [first_name for first_name, _ in poll_data['yes_voters']]
+        
+        if not participation_table:
+            participation_table = dev_functions.create_participation_dict(first_names)
+
+        #generate a match up
+        matchup = weighted_matchup_generate(participation_table=participation_table, num_of_strips=num_strips)
+
+        print("\nFinal Matchups:", matchup)
+        print("\nParticipation Counts:", participation_count)
+        
+        on_strip_message = dev_functions.on_strip_message(matchup=matchup, match_number=bout_iterator)
+
+        bot.reply_to(message, on_strip_message, reply_markup=gen_markup())
+    else:
+        bot.reply_to(message, "No poll data available for this chat.")
+
+
+#adds buttons for the queue message
+def gen_markup():
+    markup = InlineKeyboardMarkup()
+    markup.row_width = 5
+    markup.add(InlineKeyboardButton("prev", callback_data="cb_prev"),
+                InlineKeyboardButton("skip left", callback_data="cb_skip_left"),
+                InlineKeyboardButton("skip right", callback_data="cb_skip_right"),
+                InlineKeyboardButton("next", callback_data="cb_next"),
+                InlineKeyboardButton("force", callback_data="cb_force"))
+
+    return markup
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_query(call):
+    if call.data == "cb_prev":
+        global bout_iterator
+        if bout_iterator == 0:
+            return
+        bout_iterator -= 1
+        print(bout_history)
+        on_strip_message = dev_functions.on_strip_message(matchup=bout_history[bout_iterator], match_number=bout_iterator)
+
+        bot.edit_message_text(on_strip_message, call.message.chat.id, call.message.message_id, reply_markup=gen_markup())
+
+    elif call.data == "cb_next":
+        global participation_table
+        if bout_iterator == (len(bout_history) - 1):
+            weighted_matchup_generate(participation_table=participation_table, num_of_strips=num_strips)
+        bout_iterator += 1
+        print(bout_history)
+        on_strip_message = dev_functions.on_strip_message(matchup=bout_history[bout_iterator], match_number=bout_iterator)
+        
+        bot.edit_message_text(on_strip_message, call.message.chat.id, call.message.message_id, reply_markup=gen_markup())
 
 @bot.message_handler(commands=['add'])
 def add_voters(message):
