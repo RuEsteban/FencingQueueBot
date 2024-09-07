@@ -50,26 +50,31 @@ def weighted_random_pairing(participation_count, bout_history, bout_iterator, ra
     p1 = 'def1'
     p2 = 'def2'
 
-    p1_marker = True
-    p2_marker = True
     # Select two participants using weighted random choice
 
-    same_bout_marker = True
+    same_bout_marker = False
 
     #TODO: WE DON"T WANT TO FENCE THE SAME PEOPLE AGAIN UNTIL WE'VE FENCED EVERYONE AT LEAST ONCE
     while(same_bout_marker):
         # SELECT FENCER 1
+
+        #only do this for the first bout
         if len(bout_history) == 0:
             p1 = weighted_choice(available_participants)
             available_participants.remove(p1)
         else:
-            while(p1_marker):
+            while(True):
+                #find a potential participant
                 temp = weighted_choice(available_participants)
-                p1_another_marker = True
+                p1_marker = True
+
+                #iterate through the past x number of bouts to see if they've participated
                 for i in range(len(bout_history), len(bout_history) - min(rate_limiter, len(bout_history)), -1):
+                    #if they have participated, then flag
                     if check_if_participate(temp,bout_history[i-1]):
-                        p1_another_marker = False
-                if p1_another_marker:
+                        p1_marker = False
+                #if unchanged flag, then we know that this person doesn't show up in the past x bouts
+                if p1_marker:
                     break
             p1 = temp
             available_participants.remove(p1)
@@ -79,13 +84,13 @@ def weighted_random_pairing(participation_count, bout_history, bout_iterator, ra
             p2 = weighted_choice(available_participants)
             available_participants.remove(p2)
         else:
-            while(p2_marker):
+            while(True):
                 temp = weighted_choice(available_participants)
-                p2_another_marker = True
+                p2_marker = True
                 for i in range(len(bout_history), len(bout_history) - min(rate_limiter, len(bout_history)), -1):
                     if check_if_participate(temp,bout_history[i-1]):
-                        p2_another_marker = False
-                if p2_another_marker:
+                        p2_marker = False
+                if p2_marker:
                     break
             p2 = temp
             available_participants.remove(p2)

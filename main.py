@@ -234,6 +234,9 @@ def weighted_matchup_generate(participation_table, num_of_strips):
 
     return matchup
 
+#syntax: /weighted_queue [@param]
+#@param = number of strips 
+#example: when two strips -> /weighted_queue 2
 @bot.message_handler(commands=['weighted_queue'])
 def create_weighted_queue(message):
     global participation_table
@@ -254,6 +257,7 @@ def create_weighted_queue(message):
         # Get the list of first names who voted "Yes"
         first_names = [first_name for first_name, _ in poll_data['yes_voters']]
         
+        #when a new poll is made, the participant table is cleared, so we'll need to make a new one if we see that its empty
         if not participation_table:
             participation_table = dev_functions.create_participation_dict(first_names)
 
